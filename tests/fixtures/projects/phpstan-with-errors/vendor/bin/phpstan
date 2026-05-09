@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+echo '{"totals":{"errors":0,"file_errors":2},"files":{"/abs/Foo.php":{"errors":2,"messages":[{"message":"Type missing","line":12,"ignorable":true,"identifier":"missingType.parameter"},{"message":"Another issue","line":20,"ignorable":true,"identifier":"missingType.return"}]}},"errors":[]}'
+exit 1

@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+echo 'Fatal error: could not load config' >&2
+exit 2
