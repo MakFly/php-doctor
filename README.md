@@ -8,6 +8,16 @@ HTML report with a global health score.
 
 **Stack:** PHP 8.3+ · nikic/php-parser ^5 · Symfony Console 7 · Twig 3
 
+### Supported framework matrix
+
+| Framework | Versions tested | Detection signal | Runtime introspection |
+|---|---|---|---|
+| Symfony   | 6.4 LTS · 7.x · 8.x | `symfony/framework-bundle` in `composer.json` | `bin/console debug:* --format=json` (DescriptorHelper, present since 3.x) |
+| Laravel   | 10 · 11 · 12 · 13   | `laravel/framework` in `composer.json`        | `php artisan route:list --json` (≥9), `about --json` (≥9), `migrate:status` text parser (all versions) |
+| Generic   | n/a                 | neither of the above                          | `composer audit --format=json` only |
+
+Detection is version-agnostic — any constraint matching the package name is supported. The matrix is pinned by a parameterized test (`ProjectDetectorTest::supportedFrameworkVersions`).
+
 ## Installation
 
 ### Via PHAR (recommended)
