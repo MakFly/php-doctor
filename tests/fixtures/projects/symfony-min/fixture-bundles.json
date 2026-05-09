@@ -1,0 +1,4 @@
+{
+    "FrameworkBundle": "Symfony\\Bundle\\FrameworkBundle\\FrameworkBundle",
+    "TwigBundle": "Symfony\\Bundle\\TwigBundle\\TwigBundle"
+}

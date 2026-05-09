@@ -1,0 +1,17 @@
+{
+    "definitions": {
+        "App\\Service\\GreetingService": {
+            "class": "App\\Service\\GreetingService",
+            "public": false,
+            "synthetic": false,
+            "lazy": false,
+            "shared": true,
+            "abstract": false,
+            "autowired": true,
+            "autoconfigured": true,
+            "file": null
+        }
+    },
+    "aliases": {},
+    "services": {}
+}

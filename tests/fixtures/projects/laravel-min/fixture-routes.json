@@ -1,0 +1,18 @@
+[
+    {
+        "domain": null,
+        "method": "GET|HEAD",
+        "uri": "/",
+        "name": "home",
+        "action": "App\\Http\\Controllers\\HomeController@index",
+        "middleware": ["web"]
+    },
+    {
+        "domain": null,
+        "method": "GET|HEAD",
+        "uri": "api/user",
+        "name": "api.user",
+        "action": "Closure",
+        "middleware": ["api", "auth:sanctum"]
+    }
+]

@@ -1,0 +1,26 @@
+{
+    "_profiler": {
+        "path": "/_profiler/{token}",
+        "pathRegex": "{^/_profiler/(?P<token>[^/]++)$}sDu",
+        "host": "ANY",
+        "scheme": "ANY",
+        "method": "ANY",
+        "class": "Symfony\\Component\\Routing\\Route",
+        "defaults": {"_controller": "web_profiler.controller.profiler::panelAction"},
+        "requirements": {},
+        "options": {},
+        "condition": ""
+    },
+    "app_index": {
+        "path": "/",
+        "pathRegex": "{^/$}sDu",
+        "host": "ANY",
+        "scheme": "ANY",
+        "method": "GET",
+        "class": "Symfony\\Component\\Routing\\Route",
+        "defaults": {"_controller": "App\\Controller\\DefaultController::index"},
+        "requirements": {},
+        "options": {},
+        "condition": ""
+    }
+}

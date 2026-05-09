@@ -1,0 +1,20 @@
+{
+    "kernel.request": [
+        {
+            "type": "function",
+            "name": "onKernelRequest",
+            "class": "Symfony\\Component\\HttpKernel\\EventListener\\RouterListener",
+            "static": false,
+            "priority": 32
+        }
+    ],
+    "kernel.response": [
+        {
+            "type": "function",
+            "name": "onKernelResponse",
+            "class": "Symfony\\Component\\HttpKernel\\EventListener\\ResponseListener",
+            "static": false,
+            "priority": 0
+        }
+    ]
+}
