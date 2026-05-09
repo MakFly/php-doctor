@@ -80,7 +80,7 @@ final class ConsoleReporter implements Reporter
                 Severity::Info->value     => 4,
             ];
             usort($allFindings, static function (Finding $a, Finding $b) use ($severityOrder): int {
-                return ($severityOrder[$a->severity->value] ?? 99) <=> ($severityOrder[$b->severity->value] ?? 99);
+                return $severityOrder[$a->severity->value] <=> $severityOrder[$b->severity->value];
             });
 
             $truncated = false;

@@ -400,10 +400,10 @@ Chaque règle = 1 fichier `src/Rules/.../*.php` + 1 fichier de test `tests/Rules
 4. PHPStan sur php-doctor lui-même (eat-your-own-dogfood) : `vendor/bin/phpstan analyse src/ --level=6` → 0 erreur.
 
 ### Critères de done MVP
-- [ ] Phases 1 à 10 cochées.
-- [ ] README à jour avec : install, usage, exemple de rapport, limites connues (ex: heuristique N+1, workaround Laravel config).
-- [ ] CHANGELOG initial `0.1.0`.
-- [ ] PHAR signé téléchargeable depuis une release GitHub.
+- [x] Phases 1 à 10 cochées.
+- [x] README à jour avec : install, usage, exemple de rapport, limites connues (ex: heuristique N+1, workaround Laravel config).
+- [x] CHANGELOG initial `0.1.0`.
+- [ ] PHAR signé téléchargeable depuis une release GitHub. (TODO: créer release v0.1.0 sur GitHub)
 
 ---
 

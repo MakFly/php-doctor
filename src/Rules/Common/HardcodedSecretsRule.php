@@ -30,19 +30,6 @@ use PhpParser\NodeVisitor\NameResolver;
  */
 final class HardcodedSecretsRule implements Rule
 {
-    /** Patterns that identify known secret formats. */
-    private const SECRET_PATTERNS = [
-        '/AKIA[0-9A-Z]{16}/',
-        '/ghp_[0-9A-Za-z]{36}/',
-        '/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/',
-    ];
-
-    /** Placeholder values that should NOT be flagged. */
-    private const PLACEHOLDERS = ['changeme', '***', '', 'your_secret', 'your_token', 'your_key', 'xxxxxxxx'];
-
-    /** Key name pattern for define()/putenv() secret detection. */
-    private const SECRET_KEY_PATTERN = '/PASSWORD|SECRET|TOKEN|API_KEY/i';
-
     public function __construct(
         private readonly ParserPool $parserPool,
     ) {}
