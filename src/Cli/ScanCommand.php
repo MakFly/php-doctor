@@ -27,6 +27,7 @@ use PhpDoctor\Reporting\Console\ConsoleReporter;
 use PhpDoctor\Reporting\Html\HtmlReporter;
 use PhpDoctor\Reporting\Json\JsonReporter;
 use PhpDoctor\Reporting\Reporter;
+use PhpDoctor\Reporting\Sarif\SarifReporter;
 use PhpDoctor\Rules\RuleProvider;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -42,7 +43,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 )]
 final class ScanCommand extends Command
 {
-    private const VALID_FORMATS = ['console', 'json', 'html'];
+    private const VALID_FORMATS = ['console', 'json', 'html', 'sarif'];
 
     protected function configure(): void
     {
@@ -66,6 +67,26 @@ final class ScanCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Write output to file (useful for json/html formats).',
                 null
+            )
+            ->addOption(
+                'ci',
+                null,
+                InputOption::VALUE_NONE,
+                'Enable CI mode: defaults output to JSON, enables exit-code thresholds.',
+            )
+            ->addOption(
+                'min-score',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'In --ci mode, exit 1 if the global score is below this value (0–100).',
+                null
+            )
+            ->addOption(
+                'fail-on',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'In --ci mode, exit 1 if any finding has at least this severity (critical|high|medium|low|info).',
+                null
             );
     }
 
@@ -73,9 +94,30 @@ final class ScanCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        // --- 1. Validate format option ---
+        // --- 1. Resolve CI flags ---
+        $ciMode   = (bool) $input->getOption('ci');
+        $minScore = $input->getOption('min-score') !== null ? (int) $input->getOption('min-score') : null;
+        /** @var string|null $failOn */
+        $failOn   = $input->getOption('fail-on');
+
+        // Validate --fail-on value when present.
+        if ($failOn !== null && !\PhpDoctor\Core\Rule\Severity::tryFrom($failOn)) {
+            $io->error(sprintf(
+                'Invalid --fail-on value "%s". Valid values: critical, high, medium, low, info.',
+                $failOn,
+            ));
+            return Command::FAILURE;
+        }
+
+        // --- 2. Validate format option ---
         /** @var string $format */
         $format = $input->getOption('format');
+
+        // In CI mode, default to JSON if the user did not explicitly set a format.
+        if ($ciMode && $format === 'console') {
+            $format = 'json';
+        }
+
         if (!in_array($format, self::VALID_FORMATS, true)) {
             $io->error(sprintf(
                 'Invalid format "%s". Valid formats: %s.',
@@ -144,8 +186,27 @@ final class ScanCommand extends Command
         $score = Score::fromBag($bag);
 
         // --- 10. Select reporter and render ---
-        $reporter = $this->buildReporter($format, $outputFile);
-        return $reporter->render($bag, $score, $ctx, $output);
+        $reporter  = $this->buildReporter($format, $outputFile);
+        $exit      = $reporter->render($bag, $score, $ctx, $output);
+
+        // --- 11. CI threshold enforcement (only when --ci is passed) ---
+        if ($ciMode) {
+            if ($minScore !== null && $score->global < $minScore) {
+                $exit = Command::FAILURE;
+            }
+
+            if ($failOn !== null) {
+                $threshold = \PhpDoctor\Core\Rule\Severity::from($failOn);
+                foreach ($bag->all() as $finding) {
+                    if ($finding->severity->weight() >= $threshold->weight()) {
+                        $exit = Command::FAILURE;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $exit;
     }
 
     private function buildReporter(string $format, ?string $outputFile): Reporter
@@ -153,6 +214,7 @@ final class ScanCommand extends Command
         return match ($format) {
             'json'  => new JsonReporter($outputFile),
             'html'  => new HtmlReporter($outputFile),
+            'sarif' => new SarifReporter($outputFile),
             default => new ConsoleReporter(),
         };
     }
