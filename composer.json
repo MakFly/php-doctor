@@ -30,6 +30,10 @@
     "bin": [
         "bin/php-doctor"
     ],
+    "scripts": {
+        "build": "vendor/bin/box compile -v",
+        "test": "vendor/bin/phpunit"
+    },
     "config": {
         "optimize-autoloader": true,
         "sort-packages": true

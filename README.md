@@ -7,8 +7,22 @@ Combines AST analysis, runtime introspection, PHPStan integration, and a Lightho
 
 **Stack:** PHP 8.3 · nikic/php-parser 5 · Symfony Console 7 · Twig 3
 
-## Install
+## Installation
 
+### Via PHAR (recommandé)
+Téléchargez la dernière release :
+```bash
+curl -L -o php-doctor.phar https://github.com/MakFly/php-doctor/releases/latest/download/php-doctor.phar
+chmod +x php-doctor.phar
+./php-doctor.phar scan /path/to/project
+```
+
+### Via Composer (dev)
+```bash
+composer require --dev makfly/php-doctor
+```
+
+### Depuis les sources
 ```bash
 composer install
 ```

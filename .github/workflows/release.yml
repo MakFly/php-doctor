@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+      - name: Install dependencies (with dev for box)
+        run: composer install --no-interaction --no-progress
+      - name: Build PHAR
+        run: composer build
+      - name: Verify PHAR
+        run: |
+          test -x build/php-doctor.phar
+          ./build/php-doctor.phar list
+          ./build/php-doctor.phar scan tests/fixtures/projects/symfony-min/ --format=json > /tmp/scan.json
+          test -s /tmp/scan.json
+      - name: Compute SHA256
+        run: |
+          cd build
+          sha256sum php-doctor.phar > php-doctor.phar.sha256
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/php-doctor.phar
+            build/php-doctor.phar.sha256
+          generate_release_notes: true
