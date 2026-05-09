@@ -1,0 +1,160 @@
+name: Compatibility matrix
+
+# Smoke-tests php-doctor against real Symfony 6/7/8 and Laravel 10/11/12/13
+# skeletons. Each job spins up a target project via composer create-project,
+# then runs the freshly-built PHAR against it and asserts exit 0 + valid JSON.
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-phar:
+    name: Build PHAR (once)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - run: composer build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: php-doctor-phar
+          path: build/php-doctor.phar
+          retention-days: 1
+
+  scan-symfony:
+    name: Scan Symfony ${{ matrix.version }}
+    needs: build-phar
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: '6.4'
+            php: '8.3'
+            constraint: '^6.4'
+          - version: '7.x'
+            php: '8.3'
+            constraint: '^7.0'
+          - version: '8.x'
+            php: '8.4'
+            constraint: '^8.0'
+    steps:
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+          extensions: intl, mbstring, xml
+      - uses: actions/download-artifact@v4
+        with:
+          name: php-doctor-phar
+          path: bin
+      - run: chmod +x bin/php-doctor.phar
+      - name: Create Symfony ${{ matrix.version }} skeleton project
+        id: skeleton
+        run: |
+          set -e
+          composer create-project symfony/skeleton:${{ matrix.constraint }} target \
+            --no-interaction --prefer-dist --no-progress
+        continue-on-error: true
+      - name: Skip if skeleton not yet released
+        if: steps.skeleton.outcome == 'failure'
+        run: echo "Skeleton symfony/skeleton:${{ matrix.constraint }} not available yet — skipping scan."
+      - name: Run scan
+        if: steps.skeleton.outcome == 'success'
+        run: |
+          set -e
+          ./bin/php-doctor.phar scan target/ --format=json > scan-output.json
+          test -s scan-output.json
+          python3 -m json.tool scan-output.json > /dev/null
+          echo "Scan succeeded — top of report:"
+          head -c 800 scan-output.json
+          echo
+      - name: Run scan in CI mode (advisory threshold only)
+        if: steps.skeleton.outcome == 'success'
+        run: |
+          # Just check the CI mode path doesn't crash. No min-score enforced
+          # because skeletons may legitimately have findings (env-desync etc).
+          ./bin/php-doctor.phar scan target/ --ci --format=json > /dev/null
+
+  scan-laravel:
+    name: Scan Laravel ${{ matrix.version }}
+    needs: build-phar
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: '10.x'
+            php: '8.3'
+            constraint: '^10.0'
+          - version: '11.x'
+            php: '8.3'
+            constraint: '^11.0'
+          - version: '12.x'
+            php: '8.3'
+            constraint: '^12.0'
+          - version: '13.x'
+            php: '8.4'
+            constraint: '^13.0'
+    steps:
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          coverage: none
+          extensions: intl, mbstring, xml, bcmath, pdo_sqlite, sqlite3
+      - uses: actions/download-artifact@v4
+        with:
+          name: php-doctor-phar
+          path: bin
+      - run: chmod +x bin/php-doctor.phar
+      - name: Create Laravel ${{ matrix.version }} skeleton project
+        id: skeleton
+        run: |
+          set -e
+          composer create-project laravel/laravel:${{ matrix.constraint }} target \
+            --no-interaction --prefer-dist --no-progress
+        continue-on-error: true
+      - name: Skip if skeleton not yet released
+        if: steps.skeleton.outcome == 'failure'
+        run: echo "Skeleton laravel/laravel:${{ matrix.constraint }} not available yet — skipping scan."
+      - name: Generate APP_KEY (some scans boot the app)
+        if: steps.skeleton.outcome == 'success'
+        working-directory: target
+        run: php artisan key:generate --ansi
+      - name: Run scan
+        if: steps.skeleton.outcome == 'success'
+        run: |
+          set -e
+          ./bin/php-doctor.phar scan target/ --format=json > scan-output.json
+          test -s scan-output.json
+          python3 -m json.tool scan-output.json > /dev/null
+          echo "Scan succeeded — top of report:"
+          head -c 800 scan-output.json
+          echo
+      - name: Run scan in CI mode (advisory threshold only)
+        if: steps.skeleton.outcome == 'success'
+        run: |
+          ./bin/php-doctor.phar scan target/ --ci --format=json > /dev/null
+
+  matrix-summary:
+    name: Matrix summary
+    needs: [scan-symfony, scan-laravel]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Symfony jobs status: ${{ needs.scan-symfony.result }}"
+          echo "Laravel jobs status: ${{ needs.scan-laravel.result }}"
+          # We don't fail the summary even if some matrix entries failed —
+          # individual job statuses are visible in the Checks tab and the
+          # PR's required-checks gate decides what blocks merge.
