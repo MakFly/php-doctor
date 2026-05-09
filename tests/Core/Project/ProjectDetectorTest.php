@@ -83,4 +83,37 @@ final class ProjectDetectorTest extends TestCase
         $detector = new ProjectDetector();
         $detector->detect('/tmp/__php_doctor_nonexistent_path_' . uniqid());
     }
+
+    /**
+     * @dataProvider supportedFrameworkVersions
+     */
+    public function testDetectsAcrossSupportedVersions(string $package, string $constraint, Framework $expected): void
+    {
+        $tmp = sys_get_temp_dir() . '/phpdoctor-version-' . uniqid();
+        mkdir($tmp);
+        file_put_contents($tmp . '/composer.json', json_encode([
+            'name'    => 'test/version-matrix',
+            'require' => ['php' => '^8.3', $package => $constraint],
+        ], JSON_THROW_ON_ERROR));
+
+        try {
+            $ctx = (new ProjectDetector())->detect($tmp);
+            $this->assertSame($expected, $ctx->framework, "Failed for {$package}:{$constraint}");
+        } finally {
+            unlink($tmp . '/composer.json');
+            rmdir($tmp);
+        }
+    }
+
+    /** @return iterable<string,array{string,string,Framework}> */
+    public static function supportedFrameworkVersions(): iterable
+    {
+        yield 'symfony 6'  => ['symfony/framework-bundle', '^6.4',  Framework::Symfony];
+        yield 'symfony 7'  => ['symfony/framework-bundle', '^7.0',  Framework::Symfony];
+        yield 'symfony 8'  => ['symfony/framework-bundle', '^8.0',  Framework::Symfony];
+        yield 'laravel 10' => ['laravel/framework',        '^10.0', Framework::Laravel];
+        yield 'laravel 11' => ['laravel/framework',        '^11.0', Framework::Laravel];
+        yield 'laravel 12' => ['laravel/framework',        '^12.0', Framework::Laravel];
+        yield 'laravel 13' => ['laravel/framework',        '^13.0', Framework::Laravel];
+    }
 }

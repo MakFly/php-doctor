@@ -5,3 +5,6 @@ build/
 .phpunit.result.cache
 .ai/reports/
 .ai/state/
+
+# instant-grep index
+.ig/

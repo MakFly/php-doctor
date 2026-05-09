@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Documented and tested the full supported framework matrix:
+  Symfony 6.4 · 7.x · 8.x and Laravel 10 · 11 · 12 · 13.
+  No code change required — the detector is version-agnostic by design;
+  this release adds an explicit parameterized test that pins the matrix.
+
 ## [0.1.0] - 2026-05-09
 
 ### Added
 - Initial MVP release.
-- Project detection: Symfony 6/7+, Laravel 11/12+, generic.
+- Project detection: Symfony 6/7/8, Laravel 10/11/12/13, generic.
 - AST pipeline (nikic/php-parser ^5) with ParserPool reuse and AstSnapshot memoization.
 - Runtime pipeline:
   - Symfony: `debug:router`, `debug:container`, `debug:event-dispatcher`, kernel bundles.
