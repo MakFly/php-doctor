@@ -6,6 +6,7 @@ namespace PhpDoctor\Tests\Core\Rule;
 
 use PhpDoctor\Core\AnalysisInput;
 use PhpDoctor\Core\Finding\Finding;
+use PhpDoctor\Core\Project\Framework;
 use PhpDoctor\Core\Project\FrameworkContext;
 use PhpDoctor\Core\Rule\Category;
 use PhpDoctor\Core\Rule\Rule;
@@ -21,7 +22,7 @@ final class RuleRegistryTest extends TestCase
         $registry->register($this->makeRule('rule.a', appliesTo: true));
         $registry->register($this->makeRule('rule.b', appliesTo: false));
 
-        $ctx     = new FrameworkContext('/tmp', 'generic');
+        $ctx     = new FrameworkContext(Framework::Generic, '/tmp', null, [], []);
         $enabled = iterator_to_array($registry->enabledFor($ctx), false);
 
         $this->assertCount(1, $enabled);
