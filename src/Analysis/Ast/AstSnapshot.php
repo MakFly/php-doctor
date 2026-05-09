@@ -25,6 +25,18 @@ final class AstSnapshot
     ) {}
 
     /**
+     * Pre-populate the cache with an already-parsed result.
+     * Used by AstAnalyzer to share per-file parse results into the shared snapshot
+     * without re-parsing.
+     *
+     * @param Node[]|null $stmts
+     */
+    public function prime(string $absolutePath, ?array $stmts): void
+    {
+        $this->cache[$absolutePath] = $stmts;
+    }
+
+    /**
      * Return parsed AST for the given absolute path, memoising the result.
      *
      * Returns null when the file cannot be read or parsed.

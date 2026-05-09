@@ -46,6 +46,8 @@ final class MigrationCollector
         $result = $this->exec->run(
             ['php', $ctx->consoleBinary, 'migrate:status'],
             $ctx->rootPath,
+            30,
+            ['APP_ENV' => 'local', 'APP_DEBUG' => '0'],
         );
 
         // migrate:status exits 0 whether or not migrations are pending.

@@ -32,16 +32,26 @@ final class AstAnalyzer
      */
     public function analyze(FrameworkContext $ctx, FindingBag $bag, iterable $rules): AstSnapshot
     {
-        // Shared snapshot so parsedFileCount() reflects the whole scan.
-        $errorHandler = new Collecting();
-        $snapshot     = new AstSnapshot($this->pool, $errorHandler);
+        // We use a shared snapshot for the memoised cache but create a *fresh*
+        // Collecting error handler per file so we can detect partial-AST errors
+        // independently (a shared handler would accumulate errors across files
+        // and make it impossible to know which file triggered each error).
+        $sharedErrorHandler = new Collecting();
+        $snapshot           = new AstSnapshot($this->pool, $sharedErrorHandler);
 
         foreach ($this->walker->walk($ctx) as $file) {
             $realPath = $file->getRealPath();
-            $stmts    = $snapshot->forFile($realPath);
+
+            // Per-file error handler so we can check hasErrors() after each parse.
+            $fileErrorHandler = new Collecting();
+            $fileSnapshot     = new AstSnapshot($this->pool, $fileErrorHandler);
+            $stmts            = $fileSnapshot->forFile($realPath);
+
+            // Propagate to the shared snapshot cache so callers get a unified view.
+            $snapshot->prime($realPath, $stmts);
 
             if ($stmts === null) {
-                // Could not parse the file — emit an informational finding and continue.
+                // Hard parse failure (file unreadable or completely unparseable).
                 $bag->add(new Finding(
                     ruleId:   'php-doctor.parse-error',
                     severity: Severity::Info,
@@ -51,6 +61,21 @@ final class AstAnalyzer
                     line:     null,
                 ));
                 continue;
+            }
+
+            // Also emit a finding when the parser returned a partial AST but
+            // still collected syntax errors (previously these were silently dropped).
+            if ($fileErrorHandler->hasErrors()) {
+                foreach ($fileErrorHandler->getErrors() as $parseError) {
+                    $bag->add(new Finding(
+                        ruleId:   'php-doctor.parse-error',
+                        severity: Severity::Info,
+                        category: Category::Hygiene,
+                        message:  'File has syntax errors: ' . $parseError->getMessage(),
+                        file:     $realPath,
+                        line:     $parseError->getStartLine() > 0 ? $parseError->getStartLine() : null,
+                    ));
+                }
             }
 
             // Traverse with NameResolver so downstream visitors have resolved names.

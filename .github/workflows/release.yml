@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+# Default to read-only; the build job overrides to contents: write for the release upload.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest

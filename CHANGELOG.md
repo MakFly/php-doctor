@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Fix RCE via path injection in `Laravel\ConfigCollector` — paths are no longer interpolated into the `php -r` script (use cwd + relative paths).
+- Fix HTML report XSS via finding messages — JSON embed now escapes `<`, `>`, `&`, `'`, `"` to `\u00XX` via `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT`.
+- Force `APP_ENV=local` and `APP_DEBUG=0` for all Laravel runtime collectors (ConfigCollector, RouteCollector, AboutCollector, MigrationCollector).
+- Workflows now pin top-level `permissions: { contents: read }`; release workflow keeps `contents: write` scoped to the publish job only.
+
+### Fixed
+- `MissingIsGranted` no longer flags methods of classes that carry a class-level `#[IsGranted]` / `#[Security]` attribute.
+- `AstAnalyzer` now emits parse-error findings when the parser returns a partial AST with errors (previously only emitted when AST was null).
+- `ProcessExecutorInterface::run()` accepts an optional 4th `array $env` parameter for injecting environment variables into spawned processes.
+
+### Known issues (post-MVP)
+- `EloquentNPlusOne` heuristic: false positives possible when eager loading is split across statements (codex review notable).
+- `MassAssignment` does not yet check `$fillable`/`$guarded` on the model.
+- `HardcodedSecrets` only inspects `define()`/`putenv()`, not array items / class constants / properties.
+- `MissingIsGranted` only inspects top-level method statements (not nested in `if`/`try`).
+- GitHub Actions are pinned to major versions, not full SHAs.
+- HTML report depends on Tailwind CDN (not fully offline).
+- SARIF does not yet redact paths outside project root.
+
 ### Changed
 - Documented and tested the full supported framework matrix:
   Symfony 6.4 · 7.x · 8.x and Laravel 10 · 11 · 12 · 13.

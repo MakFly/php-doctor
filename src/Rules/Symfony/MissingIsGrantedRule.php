@@ -155,6 +155,12 @@ final class MissingIsGrantedRule implements Rule
                     continue;
                 }
 
+                // If the class itself carries #[IsGranted] or #[Security], every
+                // method in it is protected — skip the whole class.
+                if ($this->hasAccessControlAttribute($inner->attrGroups)) {
+                    return null;
+                }
+
                 // Find the method
                 foreach ($inner->stmts as $member) {
                     if (!($member instanceof Node\Stmt\ClassMethod)) {
@@ -166,14 +172,9 @@ final class MissingIsGrantedRule implements Rule
                         continue;
                     }
 
-                    // Check for #[IsGranted] or #[Security] attribute
-                    foreach ($member->attrGroups as $attrGroup) {
-                        foreach ($attrGroup->attrs as $attr) {
-                            $attrName = (string) $attr->name;
-                            if (str_ends_with($attrName, 'IsGranted') || str_ends_with($attrName, 'Security')) {
-                                return null; // protected
-                            }
-                        }
+                    // Check for #[IsGranted] or #[Security] attribute on the method
+                    if ($this->hasAccessControlAttribute($member->attrGroups)) {
+                        return null; // protected
                     }
 
                     // Check for denyAccessUnlessGranted() call in method body
@@ -196,6 +197,24 @@ final class MissingIsGrantedRule implements Rule
         }
 
         return null;
+    }
+
+    /**
+     * Return true if any attribute group contains IsGranted or Security.
+     *
+     * @param Node\AttributeGroup[] $attrGroups
+     */
+    private function hasAccessControlAttribute(array $attrGroups): bool
+    {
+        foreach ($attrGroups as $attrGroup) {
+            foreach ($attrGroup->attrs as $attr) {
+                $attrName = (string) $attr->name;
+                if (str_ends_with($attrName, 'IsGranted') || str_ends_with($attrName, 'Security')) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

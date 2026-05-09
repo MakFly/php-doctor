@@ -17,13 +17,14 @@ final class ProcessExecutor implements ProcessExecutorInterface
     /**
      * Run a command in the given working directory.
      *
-     * @param array<string> $command    Command and arguments as a list (no shell interpolation).
-     * @param string        $cwd        Absolute path to the working directory.
-     * @param int           $timeoutSec Maximum execution time before kill. Default 30 s.
+     * @param array<string>        $command    Command and arguments as a list (no shell interpolation).
+     * @param string               $cwd        Absolute path to the working directory.
+     * @param int                  $timeoutSec Maximum execution time before kill. Default 30 s.
+     * @param array<string,string> $env        Extra environment variables merged on top of the inherited env.
      */
-    public function run(array $command, string $cwd, int $timeoutSec = 30): ProcessResult
+    public function run(array $command, string $cwd, int $timeoutSec = 30, array $env = []): ProcessResult
     {
-        $process = new Process($command, $cwd);
+        $process = new Process($command, $cwd, $env !== [] ? $env : null);
         $process->setTimeout($timeoutSec);
 
         try {

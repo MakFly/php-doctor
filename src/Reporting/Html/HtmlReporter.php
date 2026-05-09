@@ -88,7 +88,8 @@ final class HtmlReporter implements Reporter
                 ],
                 'findings' => $allFindings,
             ],
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+            | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
         );
 
         $html = $twig->render('report.html.twig', [

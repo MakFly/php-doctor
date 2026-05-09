@@ -34,6 +34,8 @@ final class RouteCollector
         $result = $this->exec->run(
             ['php', $ctx->consoleBinary, 'route:list', '--json'],
             $ctx->rootPath,
+            30,
+            ['APP_ENV' => 'local', 'APP_DEBUG' => '0'],
         );
 
         if (!$result->isSuccessful) {

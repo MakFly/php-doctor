@@ -45,21 +45,20 @@ final class ConfigCollector
 
         $root = $ctx->rootPath;
 
-        // Build the inline PHP as a single expression (no shell interpolation).
-        // Each element is a separate argument to `php -r` — we pass the whole
-        // script as one string so that no shell quoting issues arise.
-        $script = sprintf(
-            "require '%s/vendor/autoload.php';" .
-            "\$app=require '%s/bootstrap/app.php';" .
+        // Security: rootPath MUST NOT be interpolated into the PHP script string.
+        // We set cwd=$root and use only relative paths inside the script, so a
+        // path containing single-quotes cannot inject arbitrary PHP code.
+        $script =
+            "require 'vendor/autoload.php';" .
+            "\$app=require 'bootstrap/app.php';" .
             "\$app->make('Illuminate\\\\Contracts\\\\Console\\\\Kernel')->bootstrap();" .
-            "echo json_encode(config()->all());",
-            $root,
-            $root,
-        );
+            "echo json_encode(config()->all());";
 
         $result = $this->exec->run(
             ['php', '-r', $script],
             $root,
+            30,
+            ['APP_ENV' => 'local', 'APP_DEBUG' => '0'],
         );
 
         if (!$result->isSuccessful) {
