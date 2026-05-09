@@ -50,6 +50,17 @@ final class AstSnapshot
     }
 
     /**
+     * Iterate over all cached entries (filepath → Node[]|null).
+     * Useful for rules that need to scan all already-parsed files.
+     *
+     * @return iterable<string, Node[]|null>
+     */
+    public function entries(): iterable
+    {
+        return $this->cache;
+    }
+
+    /**
      * Number of files that have been attempted (including failures).
      * Useful for assertions in tests.
      */

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpDoctor\Cli;
 
+use PhpDoctor\Analysis\Ast\ParserPool;
+use PhpDoctor\Rules\RuleProvider;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -19,7 +21,21 @@ final class ListRulesCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $io->note('list-rules stub — not yet implemented.');
+
+        $registry = RuleProvider::buildRegistry(new ParserPool());
+
+        $rows = [];
+        foreach ($registry->all() as $rule) {
+            $rows[] = [
+                $rule->id(),
+                $rule->category()->value,
+                $rule->severity()->value,
+            ];
+        }
+
+        $io->title('php-doctor — Available Rules');
+        $io->table(['Rule ID', 'Category', 'Severity'], $rows);
+        $io->note(sprintf('%d rule(s) registered.', count($rows)));
 
         return Command::SUCCESS;
     }
