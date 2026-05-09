@@ -1,0 +1,27 @@
+{
+    "Environment": {
+        "Application Name": "Laravel",
+        "Laravel Version": "11.0.0",
+        "PHP Version": "8.3.0",
+        "Composer Version": "2.7.2",
+        "Environment": "local",
+        "Debug Mode": true,
+        "URL": "http://localhost",
+        "Maintenance Mode": false
+    },
+    "Cache": {
+        "Config": false,
+        "Events": false,
+        "Routes": false,
+        "Views": false
+    },
+    "Drivers": {
+        "Broadcasting": "log",
+        "Cache": "file",
+        "Database": "sqlite",
+        "Logs": ["stack", "single"],
+        "Mail": "log",
+        "Queue": "sync",
+        "Session": "file"
+    }
+}

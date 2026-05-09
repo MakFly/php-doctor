@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Fake bin/console for php-doctor test fixtures.
+# Responds to debug:* commands with static JSON fixtures.
+# CWD is expected to be the symfony-min project root.
+
+ARGS="$*"
+
+case "$ARGS" in
+    *"debug:router"*)
+        cat "$(dirname "$0")/../fixture-router.json"
+        ;;
+    *"--parameter=kernel.bundles"*)
+        cat "$(dirname "$0")/../fixture-bundles.json"
+        ;;
+    *"debug:container"*)
+        cat "$(dirname "$0")/../fixture-container.json"
+        ;;
+    *"debug:event-dispatcher"*)
+        cat "$(dirname "$0")/../fixture-events.json"
+        ;;
+    *)
+        echo "Unknown command: $ARGS" >&2
+        exit 2
+        ;;
+esac

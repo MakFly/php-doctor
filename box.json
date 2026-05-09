@@ -1,0 +1,17 @@
+{
+    "main": "bin/php-doctor",
+    "output": "build/php-doctor.phar",
+    "shebang": "#!/usr/bin/env php",
+    "chmod": "0755",
+    "finder": [
+        { "notName": "/LICENSE|.*\\.md|.*\\.dist|composer\\.json/", "exclude": ["doc","test","tests"], "in": "src" },
+        { "in": "vendor" },
+        { "in": "templates" }
+    ],
+    "stub": true,
+    "check-requirements": true,
+    "compactors": [
+        "KevinGH\\Box\\Compactor\\Json",
+        "KevinGH\\Box\\Compactor\\Php"
+    ]
+}

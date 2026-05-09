@@ -1,0 +1,10 @@
+vendor/
+!tests/fixtures/**/vendor/
+build/
+.phpunit.cache/
+.phpunit.result.cache
+.ai/reports/
+.ai/state/
+
+# instant-grep index
+.ig/

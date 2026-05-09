@@ -1,0 +1,48 @@
+{
+    "name": "php-doctor/php-doctor",
+    "description": "Health-check CLI for Symfony and Laravel projects — AST + runtime analysis, Lighthouse-style HTML report.",
+    "type": "project",
+    "license": "MIT",
+    "keywords": ["php", "symfony", "laravel", "static-analysis", "audit", "health-check"],
+    "require": {
+        "php": "^8.3",
+        "nikic/php-parser": "^5",
+        "symfony/console": "^7",
+        "symfony/process": "^7",
+        "symfony/finder": "^7",
+        "composer/xdebug-handler": "^3",
+        "twig/twig": "^3"
+    },
+    "require-dev": {
+        "humbug/box": "^4",
+        "phpunit/phpunit": "^11",
+        "phpstan/phpstan": "^2.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PhpDoctor\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PhpDoctor\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/php-doctor"
+    ],
+    "scripts": {
+        "build": "vendor/bin/box compile -v",
+        "test": "vendor/bin/phpunit"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "platform": {
+            "php": "8.3.0"
+        },
+        "allow-plugins": {
+            "composer/package-versions-deprecated": true
+        }
+    }
+}

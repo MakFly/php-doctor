@@ -1,0 +1,39 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+// Locate the autoloader — supports: dev (composer install in project),
+// global composer install, and PHAR distribution.
+$autoloaderCandidates = [
+    __DIR__ . '/../vendor/autoload.php',       // project-local (dev / PHAR)
+    __DIR__ . '/../../../autoload.php',         // composer global install
+];
+
+$autoloaderFound = false;
+foreach ($autoloaderCandidates as $candidate) {
+    if (file_exists($candidate)) {
+        require $candidate;
+        $autoloaderFound = true;
+        break;
+    }
+}
+
+if (!$autoloaderFound) {
+    fwrite(STDERR, "Could not locate vendor/autoload.php. Run 'composer install' first.\n");
+    exit(1);
+}
+
+// Restart without Xdebug to avoid performance overhead during analysis.
+$xh = new \Composer\XdebugHandler\XdebugHandler('phpdoctor');
+$xh->check();
+unset($xh);
+
+use PhpDoctor\Cli\ListRulesCommand;
+use PhpDoctor\Cli\ScanCommand;
+use Symfony\Component\Console\Application;
+
+$app = new Application('php-doctor', '0.1.0-dev');
+$app->add(new ScanCommand());
+$app->add(new ListRulesCommand());
+$app->run();

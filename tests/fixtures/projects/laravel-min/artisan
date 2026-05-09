@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Fake artisan for php-doctor test fixtures.
+# Responds to artisan commands with static fixture data.
+# CWD is expected to be the laravel-min project root.
+
+ARGS="$*"
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+case "$ARGS" in
+    *"route:list"*)
+        cat "$DIR/fixture-routes.json"
+        ;;
+    *"about"*)
+        cat "$DIR/fixture-about.json"
+        ;;
+    *"migrate:status"*)
+        cat "$DIR/fixture-migrate-status.txt"
+        ;;
+    *)
+        echo "Unknown command: $ARGS" >&2
+        exit 2
+        ;;
+esac
