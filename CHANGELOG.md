@@ -12,20 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix HTML report XSS via finding messages — JSON embed now escapes `<`, `>`, `&`, `'`, `"` to `\u00XX` via `JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT`.
 - Force `APP_ENV=local` and `APP_DEBUG=0` for all Laravel runtime collectors (ConfigCollector, RouteCollector, AboutCollector, MigrationCollector).
 - Workflows now pin top-level `permissions: { contents: read }`; release workflow keeps `contents: write` scoped to the publish job only.
+- Pinned third-party GitHub Actions to full SHA (`shivammathur/setup-php`, `softprops/action-gh-release`) to prevent supply-chain tag mutation.
 
 ### Fixed
-- `MissingIsGranted` no longer flags methods of classes that carry a class-level `#[IsGranted]` / `#[Security]` attribute.
+- `MissingIsGrantedRule` no longer flags methods of classes carrying a class-level `#[IsGranted]` / `#[Security]` attribute, and now finds `$this->denyAccessUnlessGranted()` calls anywhere in the method body (was top-level only).
 - `AstAnalyzer` now emits parse-error findings when the parser returns a partial AST with errors (previously only emitted when AST was null).
 - `ProcessExecutorInterface::run()` accepts an optional 4th `array $env` parameter for injecting environment variables into spawned processes.
 
-### Known issues (post-MVP)
-- `EloquentNPlusOne` heuristic: false positives possible when eager loading is split across statements (codex review notable).
-- `MassAssignment` does not yet check `$fillable`/`$guarded` on the model.
-- `HardcodedSecrets` only inspects `define()`/`putenv()`, not array items / class constants / properties.
-- `MissingIsGranted` only inspects top-level method statements (not nested in `if`/`try`).
-- GitHub Actions are pinned to major versions, not full SHAs.
-- HTML report depends on Tailwind CDN (not fully offline).
-- SARIF does not yet redact paths outside project root.
+### Improved
+- `EloquentNPlusOneRule` now distinguishes Eloquent relations from scalar columns via a curated blacklist of ~60 common column names + 17 suffix heuristics. Also tracks eager-loaded relations across simple variable assignments (`$posts = Post::with('author')->get(); foreach ($posts …)` no longer triggers a false positive).
+- `MassAssignmentRule` resolves the target Model in the AST cache: downgrades to Low when `$fillable` is defined, upgrades to Critical when `$guarded = []`, keeps High when neither is set.
+- `HardcodedSecretsRule` expanded detection to ArrayItem, ClassConst, Property and assignment patterns; added Stripe (`sk_live_…`), Slack (`xoxb-…`), Google API (`AIza…`) token patterns.
+- HTML report is now fully self-contained: Tailwind CDN dependency removed, replaced by embedded minimal CSS (~200 lines). Report renders offline with no external requests.
+- SARIF reporter now redacts paths outside the project root (was leaking absolute paths in `artifactLocation.uri`). Out-of-tree files are emitted as `basename` only, with a `properties.outOfTreePath: true` marker.
 
 ### Changed
 - Documented and tested the full supported framework matrix:

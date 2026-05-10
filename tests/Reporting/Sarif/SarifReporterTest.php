@@ -220,6 +220,32 @@ final class SarifReporterTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/^\//', $uri);
     }
 
+    public function testOutOfTreePathIsRedacted(): void
+    {
+        $bag = new FindingBag();
+        $bag->add(new Finding(
+            ruleId:   'rule.test',
+            severity: Severity::High,
+            category: Category::Security,
+            message:  'Out-of-tree finding',
+            file:     '/etc/passwd',
+            line:     1,
+        ));
+
+        $data   = $this->renderToArray($bag);
+        $result = $data['runs'][0]['results'][0];
+
+        $uri = $result['locations'][0]['physicalLocation']['artifactLocation']['uri'];
+
+        // Must NOT contain the absolute path or any directory prefix.
+        $this->assertStringNotContainsString('/etc', $uri);
+        $this->assertStringNotContainsString('/etc/passwd', $uri);
+        // Must only be the basename.
+        $this->assertSame('passwd', $uri);
+        // Must carry the out-of-tree marker in the property bag.
+        $this->assertTrue($result['locations'][0]['physicalLocation']['properties']['outOfTreePath']);
+    }
+
     public function testEmptyBagProducesEmptyResults(): void
     {
         $bag  = new FindingBag();

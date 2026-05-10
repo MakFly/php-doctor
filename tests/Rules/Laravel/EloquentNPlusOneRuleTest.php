@@ -156,4 +156,97 @@ final class EloquentNPlusOneRuleTest extends TestCase
 
         $this->assertFalse($this->rule->appliesTo($ctx));
     }
+
+    // -------------------------------------------------------------------------
+    // New negative tests (Fix 1 — scalar column blacklist)
+    // -------------------------------------------------------------------------
+
+    public function testDoesNotFlagScalarColumnName(): void
+    {
+        // $user->name is a common DB column, not an Eloquent relation
+        $code = <<<'PHP'
+            <?php
+            $users = User::all();
+            foreach ($users as $user) {
+                echo $user->name;
+            }
+            PHP;
+
+        $findings = iterator_to_array($this->rule->analyze($this->makeInput($code)));
+
+        $this->assertEmpty($findings, 'Scalar column "name" should not be flagged as a relation');
+    }
+
+    public function testDoesNotFlagEmailColumn(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            $users = User::all();
+            foreach ($users as $user) {
+                echo $user->email;
+            }
+            PHP;
+
+        $findings = iterator_to_array($this->rule->analyze($this->makeInput($code)));
+
+        $this->assertEmpty($findings, 'Scalar column "email" should not be flagged as a relation');
+    }
+
+    // -------------------------------------------------------------------------
+    // New negative tests (Fix 2 — eager loading via prior assignment)
+    // -------------------------------------------------------------------------
+
+    public function testDoesNotFlagWhenWithIsInPriorAssignment(): void
+    {
+        // Post::with('author')->get() is assigned to $posts before the foreach.
+        // The rule should detect the eager load and skip the finding.
+        $code = <<<'PHP'
+            <?php
+            $posts = Post::with('author')->get();
+            foreach ($posts as $post) {
+                echo $post->author->name;
+            }
+            PHP;
+
+        $findings = iterator_to_array($this->rule->analyze($this->makeInput($code)));
+
+        $this->assertEmpty($findings, 'Eager loading via prior assignment should suppress the N+1 finding');
+    }
+
+    public function testDoesNotFlagWhenWithArrayIsInPriorAssignment(): void
+    {
+        // with(['author', 'comments']) covers both relations
+        $code = <<<'PHP'
+            <?php
+            $posts = Post::with(['author', 'comments'])->get();
+            foreach ($posts as $post) {
+                echo $post->author->name;
+            }
+            PHP;
+
+        $findings = iterator_to_array($this->rule->analyze($this->makeInput($code)));
+
+        $this->assertEmpty($findings, 'Eager loading via array in prior assignment should suppress the N+1 finding');
+    }
+
+    // -------------------------------------------------------------------------
+    // Positive test maintained (true relation, not in blacklist)
+    // -------------------------------------------------------------------------
+
+    public function testDetectsRelationNotCoveredByEagerLoad(): void
+    {
+        // $posts was loaded with with('author') but $post->comments is accessed
+        $code = <<<'PHP'
+            <?php
+            $posts = Post::with('author')->get();
+            foreach ($posts as $post) {
+                echo count($post->comments);
+            }
+            PHP;
+
+        $findings = iterator_to_array($this->rule->analyze($this->makeInput($code)));
+
+        $this->assertNotEmpty($findings, '"comments" is not covered by with("author") and should fire');
+        $this->assertSame('laravel.perf.eloquent-n-plus-one', $findings[0]->ruleId);
+    }
 }

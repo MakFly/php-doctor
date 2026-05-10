@@ -29,8 +29,14 @@ use PhpDoctor\Analysis\Ast\Visitors\AbstractRuleVisitor;
  * i.e., any call to create|fill|update whose first argument is a ->all() call
  * on any variable.
  *
- * NOTE: No type analysis — false positives are possible when the receiver is
- * not an Eloquent model. The fixHint explains the safe alternatives.
+ * Severity is adjusted based on the model's mass-assignment protection:
+ *  - Critical : $guarded = [] found (explicit open door)
+ *  - High     : no $fillable / $guarded defined (unknown, default behaviour)
+ *  - Low      : $fillable with values found (model appears protected; may still
+ *               be wrong if $fillable doesn't cover all fields from $request)
+ *
+ * When the model class cannot be resolved (called via variable, class not in
+ * the AST cache), the finding is kept at High (original behaviour).
  */
 final class MassAssignmentRule implements Rule
 {
@@ -67,13 +73,17 @@ final class MassAssignmentRule implements Rule
             return;
         }
 
+        // Build a map of short-class-name → FillableInfo so we can look up
+        // $fillable / $guarded status for each model referenced in the code.
+        $modelIndex = $this->buildModelIndex($input);
+
         foreach ($input->ast->entries() as $file => $stmts) {
             if ($stmts === null) {
                 continue;
             }
 
             $bag     = new FindingBag();
-            $visitor = new MassAssignmentVisitor($bag, $file);
+            $visitor = new MassAssignmentVisitor($bag, $file, $modelIndex);
 
             $traverser = $this->parserPool->newTraverser();
             $traverser->addVisitor(new NameResolver(null, ['replaceNodes' => false]));
@@ -85,6 +95,118 @@ final class MassAssignmentRule implements Rule
             }
         }
     }
+
+    /**
+     * Walk ALL files in the AST cache and extract fillable / guarded status
+     * for every class that looks like an Eloquent model (extends Model or
+     * has $fillable / $guarded properties).
+     *
+     * Returns: array<string, ModelFillableInfo>  (keyed by short class name)
+     *
+     * @return array<string, ModelFillableInfo>
+     */
+    private function buildModelIndex(AnalysisInput $input): array
+    {
+        assert($input->ast !== null);
+        $index = [];
+
+        foreach ($input->ast->entries() as $_file => $stmts) {
+            if ($stmts === null) {
+                continue;
+            }
+            $this->extractModelInfoFromStmts($stmts, $index);
+        }
+
+        return $index;
+    }
+
+    /**
+     * @param Node[]                            $stmts
+     * @param array<string, ModelFillableInfo>  $index
+     */
+    private function extractModelInfoFromStmts(array $stmts, array &$index): void
+    {
+        foreach ($stmts as $stmt) {
+            if ($stmt instanceof Node\Stmt\Namespace_) {
+                $this->extractModelInfoFromStmts($stmt->stmts, $index);
+                continue;
+            }
+
+            if (!($stmt instanceof Node\Stmt\Class_)) {
+                continue;
+            }
+
+            $className = $stmt->name instanceof Node\Identifier ? $stmt->name->name : null;
+            if ($className === null) {
+                continue;
+            }
+
+            $info = $this->inspectClassForFillable($stmt);
+            if ($info !== null) {
+                $index[$className] = $info;
+            }
+        }
+    }
+
+    private function inspectClassForFillable(Node\Stmt\Class_ $class): ?ModelFillableInfo
+    {
+        $hasFillableNonEmpty = false;
+        $hasGuardedEmpty     = false;
+
+        foreach ($class->stmts as $member) {
+            if (!($member instanceof Node\Stmt\Property)) {
+                continue;
+            }
+
+            foreach ($member->props as $prop) {
+                // $prop->name is Node\VarLikeIdentifier (extends Identifier, always non-null)
+                $propName = $prop->name->name;
+
+                if ($propName === 'fillable' && $prop->default !== null) {
+                    // $fillable = ['name', 'email', ...] — non-empty array
+                    if ($prop->default instanceof Node\Expr\Array_
+                        && count($prop->default->items) > 0
+                    ) {
+                        $hasFillableNonEmpty = true;
+                    }
+                }
+
+                if ($propName === 'guarded' && $prop->default !== null) {
+                    // $guarded = [] — empty array (most permissive)
+                    if ($prop->default instanceof Node\Expr\Array_
+                        && count($prop->default->items) === 0
+                    ) {
+                        $hasGuardedEmpty = true;
+                    }
+                }
+            }
+        }
+
+        // Only return info for classes that have at least one relevant property
+        if (!$hasFillableNonEmpty && !$hasGuardedEmpty) {
+            return null;
+        }
+
+        return new ModelFillableInfo(
+            hasFillable:    $hasFillableNonEmpty,
+            hasGuardedOpen: $hasGuardedEmpty,
+        );
+    }
+}
+
+/**
+ * Value object holding the mass-assignment protection status of a model.
+ *
+ * @internal
+ */
+final class ModelFillableInfo
+{
+    public function __construct(
+        /** True when $fillable is defined with at least one entry. */
+        public readonly bool $hasFillable,
+        /** True when $guarded = [] (no protection at all). */
+        public readonly bool $hasGuardedOpen,
+    ) {}
 }
 
 /**
@@ -94,6 +216,17 @@ final class MassAssignmentVisitor extends AbstractRuleVisitor
 {
     private const DANGEROUS_METHODS = ['create', 'fill', 'update'];
 
+    /**
+     * @param array<string, ModelFillableInfo> $modelIndex
+     */
+    public function __construct(
+        FindingBag $bag,
+        string $currentFile,
+        private readonly array $modelIndex,
+    ) {
+        parent::__construct($bag, $currentFile);
+    }
+
     public function enterNode(Node $node): ?int
     {
         // Static call: Model::create($request->all())
@@ -102,12 +235,15 @@ final class MassAssignmentVisitor extends AbstractRuleVisitor
             && in_array($node->name->name, self::DANGEROUS_METHODS, true)
             && $this->firstArgIsAllCall($node->args)
         ) {
-            $method = $node->name->name;
+            $method    = $node->name->name;
+            $modelName = $this->resolveStaticClass($node->class);
+            $severity  = $this->resolveSeverity($modelName);
+
             $this->emit(
                 'laravel.security.mass-assignment',
-                Severity::High,
+                $severity,
                 Category::Security,
-                "Unsafe mass-assignment: ::{$method}(\$request->all()) — verify that the model has a \$fillable whitelist.",
+                $this->buildMessage($severity, $method, '::', $modelName),
                 $node->getStartLine(),
                 "Use \$request->only([...]) or define a \$fillable whitelist on the model",
             );
@@ -119,10 +255,12 @@ final class MassAssignmentVisitor extends AbstractRuleVisitor
             && in_array($node->name->name, self::DANGEROUS_METHODS, true)
             && $this->firstArgIsAllCall($node->args)
         ) {
-            $method = $node->name->name;
+            $method   = $node->name->name;
+            $severity = Severity::High; // instance calls: we can't easily resolve the class
+
             $this->emit(
                 'laravel.security.mass-assignment',
-                Severity::High,
+                $severity,
                 Category::Security,
                 "Unsafe mass-assignment: ->{$method}(\$request->all()) — verify that the model has a \$fillable whitelist.",
                 $node->getStartLine(),
@@ -130,6 +268,54 @@ final class MassAssignmentVisitor extends AbstractRuleVisitor
             );
         }
 
+        return null;
+    }
+
+    /**
+     * Resolve severity based on the model's fillable/guarded status.
+     */
+    private function resolveSeverity(?string $modelName): Severity
+    {
+        if ($modelName === null || !isset($this->modelIndex[$modelName])) {
+            // Model not found in index → keep High (unknown protection status)
+            return Severity::High;
+        }
+
+        $info = $this->modelIndex[$modelName];
+
+        if ($info->hasGuardedOpen) {
+            // $guarded = [] → Critical: completely unprotected by design
+            return Severity::Critical;
+        }
+
+        if ($info->hasFillable) {
+            // $fillable defined → Low: model seems protected, but verify coverage
+            return Severity::Low;
+        }
+
+        return Severity::High;
+    }
+
+    private function buildMessage(Severity $severity, string $method, string $op, ?string $modelName): string
+    {
+        $target = $modelName !== null ? "{$modelName}{$op}{$method}" : "{$op}{$method}";
+
+        return match ($severity) {
+            Severity::Critical => "CRITICAL mass-assignment: {$target}(\$request->all()) with \$guarded = [] — model is completely unprotected.",
+            Severity::Low      => "Mass-assignment: {$target}(\$request->all()) — \$fillable is defined; verify it covers all expected fields.",
+            default            => "Unsafe mass-assignment: {$target}(\$request->all()) — verify that the model has a \$fillable whitelist.",
+        };
+    }
+
+    /**
+     * Try to extract the short class name from a static-call class node.
+     */
+    private function resolveStaticClass(Node $classNode): ?string
+    {
+        if ($classNode instanceof Node\Name) {
+            $parts = $classNode->getParts();
+            return end($parts) ?: null;
+        }
         return null;
     }
 

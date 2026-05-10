@@ -65,16 +65,28 @@ final class SarifReporter implements Reporter
             ];
 
             if ($finding->file !== null) {
-                $uri = $this->toRelativeUri($finding->file, $rootPath);
+                $outOfTree = !str_starts_with($finding->file, $rootPath . '/');
+
+                if ($outOfTree) {
+                    // File is outside the project root: emit only the basename to
+                    // avoid leaking absolute filesystem paths (e.g. vendor or /etc).
+                    // Option B: keep physicalLocation with basename + property bag flag.
+                    $uri = basename($finding->file);
+                    $physicalLocation = [
+                        'artifactLocation' => ['uri' => $uri],
+                        'properties'       => ['outOfTreePath' => true],
+                    ];
+                } else {
+                    $uri = $this->toRelativeUri($finding->file, $rootPath);
+                    $physicalLocation = [
+                        'artifactLocation' => ['uri' => $uri],
+                    ];
+                }
 
                 $region = [];
                 if ($finding->line !== null) {
                     $region['startLine'] = $finding->line;
                 }
-
-                $physicalLocation = [
-                    'artifactLocation' => ['uri' => $uri],
-                ];
                 if ($region !== []) {
                     $physicalLocation['region'] = $region;
                 }

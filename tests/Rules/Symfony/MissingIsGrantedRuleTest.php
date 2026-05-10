@@ -187,4 +187,122 @@ final class MissingIsGrantedRuleTest extends TestCase
 
         $this->assertFalse($this->rule->appliesTo($ctx));
     }
+
+    // -------------------------------------------------------------------------
+    // New negative tests (Fix 5 — recursive body search)
+    // -------------------------------------------------------------------------
+
+    public function testDoesNotFlagWhenDenyAccessIsInsideIf(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            class TestController {
+                public function show(): void {
+                    if (true) {
+                        $this->denyAccessUnlessGranted('ROLE_USER');
+                    }
+                }
+            }
+            PHP;
+
+        $routes = [
+            'app_show' => [
+                'path'     => '/posts',
+                'defaults' => ['_controller' => 'App\\Controller\\TestController::show'],
+            ],
+        ];
+
+        $findings = iterator_to_array($this->rule->analyze(
+            $this->makeInput($routes, $code, 'App\\Controller\\TestController')
+        ));
+
+        $this->assertEmpty($findings, 'denyAccessUnlessGranted() inside an if block should be detected (recursive search)');
+    }
+
+    public function testDoesNotFlagWhenDenyAccessIsInsideTry(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            class TestController {
+                public function show(): void {
+                    try {
+                        $this->denyAccessUnlessGranted('ROLE_USER');
+                    } catch (\Exception $e) {
+                        throw $e;
+                    }
+                }
+            }
+            PHP;
+
+        $routes = [
+            'app_show' => [
+                'path'     => '/posts',
+                'defaults' => ['_controller' => 'App\\Controller\\TestController::show'],
+            ],
+        ];
+
+        $findings = iterator_to_array($this->rule->analyze(
+            $this->makeInput($routes, $code, 'App\\Controller\\TestController')
+        ));
+
+        $this->assertEmpty($findings, 'denyAccessUnlessGranted() inside a try block should be detected (recursive search)');
+    }
+
+    public function testDoesNotFlagWhenDenyAccessIsInsideForeach(): void
+    {
+        $code = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            class TestController {
+                public function show(): void {
+                    foreach (['ROLE_USER'] as $role) {
+                        $this->denyAccessUnlessGranted($role);
+                    }
+                }
+            }
+            PHP;
+
+        $routes = [
+            'app_show' => [
+                'path'     => '/posts',
+                'defaults' => ['_controller' => 'App\\Controller\\TestController::show'],
+            ],
+        ];
+
+        $findings = iterator_to_array($this->rule->analyze(
+            $this->makeInput($routes, $code, 'App\\Controller\\TestController')
+        ));
+
+        $this->assertEmpty($findings, 'denyAccessUnlessGranted() inside a foreach should be detected (recursive search)');
+    }
+
+    public function testDoesNotFalseSuppressWhenOtherObjectCallsDenyAccess(): void
+    {
+        // $other->denyAccessUnlessGranted(...) should NOT suppress the finding —
+        // only $this->denyAccessUnlessGranted(...) counts
+        $code = <<<'PHP'
+            <?php
+            namespace App\Controller;
+            class TestController {
+                public function show(): void {
+                    // intentionally no access control on $this
+                }
+            }
+            PHP;
+
+        $routes = [
+            'app_show' => [
+                'path'     => '/posts',
+                'defaults' => ['_controller' => 'App\\Controller\\TestController::show'],
+            ],
+        ];
+
+        $findings = iterator_to_array($this->rule->analyze(
+            $this->makeInput($routes, $code, 'App\\Controller\\TestController')
+        ));
+
+        $this->assertNotEmpty($findings, 'Method with no access control should still fire');
+    }
 }
