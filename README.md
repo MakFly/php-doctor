@@ -1,6 +1,6 @@
 # php-doctor
 
-> **Health-check & quality audit CLI for Symfony and Laravel projects.**
+> **Health-check & quality audit CLI for Symfony 6/7/8 and Laravel 10/11/12/13 projects.**
 > Inspired by [react.doctor](https://www.react.doctor) — gives your PHP project a Lighthouse-style scored report you actually want to read.
 
 [![CI](https://github.com/MakFly/php-doctor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MakFly/php-doctor/actions/workflows/ci.yml)
@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-777bb3.svg)
 ![PHPStan level 6](https://img.shields.io/badge/PHPStan-level%206-2a4365.svg)
-![Status: alpha](https://img.shields.io/badge/status-MVP%20alpha-orange.svg)
+![Release: v0.1.0](https://img.shields.io/badge/release-v0.1.0-blue.svg)
 
 `php-doctor` scans a PHP project, cross-references its **AST** with the **framework's runtime introspection** (`bin/console debug:*`, `php artisan route:list`, `composer audit`), optionally consumes **PHPStan**'s output, and emits a **scored health report** in Console / JSON / HTML / SARIF.
 

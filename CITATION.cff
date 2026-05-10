@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+title: "php-doctor: a Symfony and Laravel project health-audit CLI"
+message: "If you use php-doctor in your research or tooling, please cite it."
+type: software
+authors:
+  - given-names: "Kevin"
+    alias: "MakFly"
+    affiliation: "Independent"
+repository-code: "https://github.com/MakFly/php-doctor"
+url: "https://github.com/MakFly/php-doctor"
+abstract: >
+  php-doctor is an opinionated health-audit CLI for PHP projects.
+  It detects Symfony 6/7/8 and Laravel 10/11/12/13 projects, runs an
+  AST analysis pipeline (nikic/php-parser), shells out to framework
+  introspection commands (debug:router, route:list, composer audit),
+  optionally consumes PHPStan output, and produces a Lighthouse-style
+  scored report in Console, JSON, HTML, or SARIF format.
+keywords:
+  - "PHP"
+  - "Symfony"
+  - "Laravel"
+  - "static analysis"
+  - "code quality"
+  - "audit"
+  - "health check"
+  - "PHPStan"
+  - "Lighthouse"
+  - "SARIF"
+  - "CLI"
+license: MIT
+version: "0.1.0"
+date-released: "2026-05-10"

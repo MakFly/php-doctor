@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a new rule, reporter, or capability
+title: "[Feature]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Please describe the feature and the use case.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of feature
+      options:
+        - "New rule"
+        - "Improve existing rule"
+        - "New reporter / output format"
+        - "New runtime collector"
+        - "CLI flag / UX"
+        - "Documentation"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem this solves
+      description: What pain point does this address? Who benefits?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a bug in php-doctor (false positive, crash, broken output, etc.)
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report. Please fill in the boxes below.
+        For **security vulnerabilities**, do NOT open a public issue — see [SECURITY.md](../SECURITY.md).
+
+  - type: input
+    id: php-doctor-version
+    attributes:
+      label: php-doctor version
+      description: Output of `./php-doctor.phar --version`
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: php-version
+    attributes:
+      label: PHP version
+      description: Output of `php --version | head -1`
+      placeholder: "PHP 8.3.x"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: framework
+    attributes:
+      label: Audited project framework
+      options:
+        - "Symfony 6.4"
+        - "Symfony 7.x"
+        - "Symfony 8.x"
+        - "Laravel 10"
+        - "Laravel 11"
+        - "Laravel 12"
+        - "Laravel 13"
+        - "Generic PHP"
+        - "Other / unknown"
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command run
+      description: The exact `php-doctor` command that produced the bug.
+      render: bash
+      placeholder: "./php-doctor.phar scan /path/to/project --format=json"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Full output, stack trace, or screenshot. Redact secrets.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected to happen
+    validations:
+      required: true
+
+  - type: textarea
+    id: minimal-reproduction
+    attributes:
+      label: Minimal reproduction (optional but appreciated)
+      description: Smallest code snippet or repo that reproduces the issue.

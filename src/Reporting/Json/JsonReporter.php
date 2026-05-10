@@ -19,7 +19,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class JsonReporter implements Reporter
 {
     private const SCHEMA_VERSION = '1';
-    private const TOOL_VERSION   = '0.1.0-dev';
+    private const TOOL_VERSION   = '0.1.0';
 
     public function __construct(
         private readonly ?string $outputFile = null,

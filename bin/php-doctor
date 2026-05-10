@@ -33,7 +33,7 @@ use PhpDoctor\Cli\ListRulesCommand;
 use PhpDoctor\Cli\ScanCommand;
 use Symfony\Component\Console\Application;
 
-$app = new Application('php-doctor', '0.1.0-dev');
+$app = new Application('php-doctor', '0.1.0');
 $app->add(new ScanCommand());
 $app->add(new ListRulesCommand());
 $app->run();
