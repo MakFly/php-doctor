@@ -335,11 +335,43 @@ final class HardcodedSecretsVisitor extends AbstractRuleVisitor
      * Return true if the value is clearly a placeholder / sentinel and
      * should never be treated as a real secret.
      */
+    /**
+     * Return true if the value looks like a PCRE regex literal (starts and ends
+     * with a delimiter, optionally followed by flags). Regex constants like
+     * `/PASSWORD|TOKEN/i` are common in security tooling itself and must not
+     * be flagged as real secrets — that would be a self-inflicted false positive.
+     */
+    private function looksLikeRegex(string $value): bool
+    {
+        if (strlen($value) < 3) {
+            return false;
+        }
+        $first = $value[0];
+        // Common PCRE delimiters
+        if (!in_array($first, ['/', '#', '~', '%', '@', '!'], true)) {
+            return false;
+        }
+        // Find a matching closing delimiter somewhere after position 0
+        $rest = substr($value, 1);
+        $closing = strrpos($rest, $first);
+        if ($closing === false || $closing === 0) {
+            return false;
+        }
+        $afterDelim = substr($rest, $closing + 1);
+        // After the closing delimiter, only valid PCRE flags (or nothing) may appear
+        return $afterDelim === '' || preg_match('/^[imsxuADSUXJ]+$/', $afterDelim) === 1;
+    }
+
     private function isPlaceholder(string $value): bool
     {
         if ($value === '') {
             return true;
         }
-        return in_array(strtolower($value), self::PLACEHOLDERS, true);
+        if (in_array(strtolower($value), self::PLACEHOLDERS, true)) {
+            return true;
+        }
+        // Regex literals (e.g. SECRET_KEY_PATTERN = '/PASSWORD|TOKEN/i') are
+        // tooling, not credentials — treat as placeholder to avoid self-FPs.
+        return $this->looksLikeRegex($value);
     }
 }
