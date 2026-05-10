@@ -158,4 +158,107 @@ final class HardcodedSecretsRuleTest extends TestCase
 
         $this->assertEmpty($findings);
     }
+
+    // -------------------------------------------------------------------------
+    // New positive tests (Fix 4 — ArrayItem, ClassConst, Property, Assignment)
+    // -------------------------------------------------------------------------
+
+    public function testDetectsStripeKeyInArrayItem(): void
+    {
+        // Build token via concatenation to avoid GitHub Push Protection
+        $stripeKey = 'sk_' . 'live_' . str_repeat('x', 24);
+        $input = $this->makeInput("<?php \$cfg = ['api_key' => '{$stripeKey}'];");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertNotEmpty($findings, 'Stripe live key in array item should be flagged');
+        $this->assertSame('common.security.hardcoded-secrets', $findings[0]->ruleId);
+        $this->assertSame(Severity::Critical, $findings[0]->severity);
+    }
+
+    public function testDetectsSecretKeyInArrayItem(): void
+    {
+        $input = $this->makeInput("<?php return ['password' => 'super-real-password-value'];");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertNotEmpty($findings, 'Hardcoded password in array item should be flagged');
+        $this->assertSame('common.security.hardcoded-secrets', $findings[0]->ruleId);
+    }
+
+    public function testDetectsSecretInClassConst(): void
+    {
+        $input = $this->makeInput("<?php class C { const API_TOKEN = 'real-secret-value-here'; }");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertNotEmpty($findings, 'Hardcoded secret in class constant should be flagged');
+        $this->assertSame('common.security.hardcoded-secrets', $findings[0]->ruleId);
+        $this->assertSame(Severity::Critical, $findings[0]->severity);
+    }
+
+    public function testDetectsSlackTokenPattern(): void
+    {
+        // Slack bot token pattern: xoxb- + at least 10 alphanumeric chars
+        $slackToken = 'xoxb-' . str_repeat('1234567890', 3);
+        $input = $this->makeInput("<?php \$t = '{$slackToken}';");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertNotEmpty($findings, 'Slack bot token should be flagged');
+        $this->assertSame('common.security.hardcoded-secrets', $findings[0]->ruleId);
+    }
+
+    public function testDetectsGoogleApiKeyPattern(): void
+    {
+        // Google API key: AIza + 35 chars
+        $googleKey = 'AIza' . str_repeat('A1b2C3d4', 4) . 'xyz';
+        $input = $this->makeInput("<?php \$k = '{$googleKey}';");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertNotEmpty($findings, 'Google API key should be flagged');
+        $this->assertSame('common.security.hardcoded-secrets', $findings[0]->ruleId);
+    }
+
+    public function testDetectsSecretInClassProperty(): void
+    {
+        // Property name must match the SECRET_KEY_PATTERN — use TOKEN which is unambiguous
+        $input = $this->makeInput("<?php class C { private string \$apiToken = 'real-token-value-here'; }");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertNotEmpty($findings, 'Hardcoded secret in class property should be flagged');
+        $this->assertSame('common.security.hardcoded-secrets', $findings[0]->ruleId);
+    }
+
+    // -------------------------------------------------------------------------
+    // New negative tests (Fix 4 — placeholders / empty values)
+    // -------------------------------------------------------------------------
+
+    public function testDoesNotFlagEmptyArrayItemValue(): void
+    {
+        $input = $this->makeInput("<?php \$cfg = ['api_key' => ''];");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertEmpty($findings, 'Empty string in array item should not be flagged');
+    }
+
+    public function testDoesNotFlagPlaceholderArrayItemValue(): void
+    {
+        $input = $this->makeInput("<?php \$cfg = ['api_key' => 'changeme'];");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertEmpty($findings, 'Placeholder value in array item should not be flagged');
+    }
+
+    public function testDoesNotFlagPlaceholderInClassConst(): void
+    {
+        $input = $this->makeInput("<?php class C { const API_TOKEN = 'changeme'; }");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertEmpty($findings, 'Placeholder value in class constant should not be flagged');
+    }
+
+    public function testDoesNotFlagNonSecretArrayKey(): void
+    {
+        $input = $this->makeInput("<?php \$cfg = ['name' => 'John Doe'];");
+        $findings = iterator_to_array($this->rule->analyze($input));
+
+        $this->assertEmpty($findings, 'Non-secret array key should not be flagged');
+    }
 }

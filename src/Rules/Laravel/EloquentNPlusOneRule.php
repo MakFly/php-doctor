@@ -30,9 +30,11 @@ use PhpDoctor\Analysis\Ast\Visitors\AbstractRuleVisitor;
  * The rule fires when ALL of the following are true:
  *  1. There is a foreach loop.
  *  2. The iterated expression does NOT have an immediately-prior ->with(...)
- *     call chained on it (checked on the expression only, no flow analysis).
+ *     call chained on it, AND no prior variable assignment in the same scope
+ *     includes ->with(...) for the same variable.
  *  3. The loop body accesses a property or method on the iteration variable
- *     that looks like an Eloquent relation (not id, *_id, *_at, count, etc.).
+ *     that looks like an Eloquent relation (not a common column name or a
+ *     name matching a non-relation suffix).
  */
 final class EloquentNPlusOneRule implements Rule
 {
@@ -94,14 +96,61 @@ final class EloquentNPlusOneRule implements Rule
  */
 final class EloquentNPlusOneVisitor extends AbstractRuleVisitor
 {
-    /** Properties/methods that are NOT Eloquent relations. */
+    /**
+     * Common Eloquent column names that are NOT relations.
+     * Accessing $model->name, $model->email, etc. is reading a DB column, not
+     * triggering a lazy-loaded relation query.
+     */
+    private const COLUMN_BLACKLIST = [
+        'id', 'name', 'title', 'email', 'password', 'status', 'type',
+        'slug', 'content', 'body', 'description', 'label', 'value', 'key',
+        'code', 'number', 'count', 'total', 'amount', 'price', 'date',
+        'time', 'year', 'month', 'day', 'address', 'city', 'country',
+        'phone', 'url', 'link', 'path', 'file', 'image', 'photo',
+        'avatar', 'color', 'icon', 'message', 'note', 'comment', 'tag',
+        'role', 'level', 'score', 'rank', 'order', 'sort', 'position',
+        'active', 'enabled', 'visible', 'public', 'hidden', 'deleted',
+        'archived', 'published', 'completed', 'verified', 'confirmed',
+        'locked', 'draft', 'pending', 'approved', 'rejected', 'paid',
+        'sent', 'received', 'read', 'unread',
+    ];
+
+    /**
+     * Known non-relation names (query builder methods / plain accessors).
+     */
     private const NON_RELATION_NAMES = [
         'id', 'count', 'first', 'last', 'save', 'delete', 'fill',
         'where', 'find', 'all', 'get', 'paginate', 'toArray', 'toJson',
     ];
 
-    /** Suffixes that indicate a column name, not a relation. */
-    private const NON_RELATION_SUFFIXES = ['_id', '_at', '_by', '_type', '_count'];
+    /**
+     * Suffixes that indicate a column name rather than a relation.
+     * "_id" → FK column, "_at" → timestamp, "_url", "_path", etc.
+     */
+    private const NON_RELATION_SUFFIXES = [
+        '_id', '_at', '_by', '_type', '_count', '_url', '_path', '_name',
+        '_key', '_code', '_hash', '_token', '_slug', '_date', '_time',
+        '_flag', '_status',
+    ];
+
+    /**
+     * Map of variable-name → set of eager-loaded relation names discovered
+     * in the current statement list (populated by scanEagerLoads()).
+     *
+     * @var array<string, array<string, true>>
+     */
+    private array $eagerLoaded = [];
+
+    /**
+     * @param Node[] $stmts
+     */
+    public function beforeTraverse(array $stmts): ?array
+    {
+        // Scan the top-level statements once before visiting nodes.
+        // This fills $this->eagerLoaded for all assignments we can see.
+        $this->scanEagerLoads($stmts);
+        return null;
+    }
 
     public function enterNode(Node $node): ?int
     {
@@ -109,12 +158,18 @@ final class EloquentNPlusOneVisitor extends AbstractRuleVisitor
             return null;
         }
 
-        // Check if the iterated expression has ->with(...) chained (eagerly loaded)
+        // Check if the iterated expression has ->with(...) chained (eagerly loaded inline)
         if ($this->hasWithCall($node->expr)) {
             return null;
         }
 
-        // Find the iteration variable name
+        // Collect the name of the variable being iterated over (e.g. $posts → "posts")
+        $iterCollectionVar = null;
+        if ($node->expr instanceof Node\Expr\Variable && is_string($node->expr->name)) {
+            $iterCollectionVar = $node->expr->name;
+        }
+
+        // Find the iteration variable name (e.g. $post → "post")
         $iterVar = $node->valueVar;
         if (!($iterVar instanceof Node\Expr\Variable) || !is_string($iterVar->name)) {
             return null;
@@ -122,11 +177,22 @@ final class EloquentNPlusOneVisitor extends AbstractRuleVisitor
 
         $varName = $iterVar->name;
 
+        // Determine which relations are already eager-loaded for this collection
+        $preloaded = ($iterCollectionVar !== null && isset($this->eagerLoaded[$iterCollectionVar]))
+            ? $this->eagerLoaded[$iterCollectionVar]
+            : [];
+
         // Look for suspect relation accesses in the loop body
         foreach ($node->stmts as $stmt) {
             $accessNode = $this->findRelationAccess($stmt, $varName);
             if ($accessNode !== null) {
                 $accessName = $this->getAccessName($accessNode);
+
+                // Skip if this relation was already eager-loaded upstream
+                if ($accessName !== null && isset($preloaded[$accessName])) {
+                    return null;
+                }
+
                 $this->emit(
                     'laravel.perf.eloquent-n-plus-one',
                     Severity::High,
@@ -142,10 +208,92 @@ final class EloquentNPlusOneVisitor extends AbstractRuleVisitor
         return null;
     }
 
+    // -------------------------------------------------------------------------
+    // Eager-load scanning
+    // -------------------------------------------------------------------------
+
+    /**
+     * Scan a list of statements for patterns like:
+     *   $var = Foo::with('rel1', 'rel2')->...->get();
+     *   $var = $query->with(['rel1', 'rel2'])->get();
+     *
+     * Fills $this->eagerLoaded[$varName] with the set of relation names found.
+     *
+     * @param Node[] $stmts
+     */
+    private function scanEagerLoads(array $stmts): void
+    {
+        foreach ($stmts as $stmt) {
+            if (!($stmt instanceof Node\Stmt\Expression)) {
+                continue;
+            }
+            $expr = $stmt->expr;
+            if (!($expr instanceof Node\Expr\Assign)) {
+                continue;
+            }
+
+            $lhs = $expr->var;
+            if (!($lhs instanceof Node\Expr\Variable) || !is_string($lhs->name)) {
+                continue;
+            }
+
+            $varName   = $lhs->name;
+            $relations = $this->extractWithRelations($expr->expr);
+            if ($relations !== []) {
+                $this->eagerLoaded[$varName] = array_fill_keys($relations, true);
+            }
+        }
+    }
+
+    /**
+     * Walk a call-chain expression and collect all relation names passed to
+     * ->with() or ::with() calls found anywhere in the chain.
+     *
+     * @return string[]
+     */
+    private function extractWithRelations(Expr $expr): array
+    {
+        $relations = [];
+
+        if ($expr instanceof Node\Expr\MethodCall || $expr instanceof Node\Expr\StaticCall) {
+            $name = $expr->name instanceof Node\Identifier ? $expr->name->name : null;
+
+            if ($name === 'with') {
+                foreach ($expr->args as $arg) {
+                    if (!($arg instanceof Node\Arg)) {
+                        continue;
+                    }
+                    // with('relation') — single string
+                    if ($arg->value instanceof Node\Scalar\String_) {
+                        $relations[] = $arg->value->value;
+                    }
+                    // with(['rel1', 'rel2']) — array of strings
+                    if ($arg->value instanceof Node\Expr\Array_) {
+                        foreach ($arg->value->items as $item) {
+                            if ($item->value instanceof Node\Scalar\String_) {
+                                $relations[] = $item->value->value;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Recurse into the left-hand side of the chain
+            $innerExpr = $expr instanceof Node\Expr\MethodCall ? $expr->var : $expr->class;
+            if ($innerExpr instanceof Expr) {
+                $relations = array_merge($relations, $this->extractWithRelations($innerExpr));
+            }
+        }
+
+        return $relations;
+    }
+
+    // -------------------------------------------------------------------------
+    // Relation detection
+    // -------------------------------------------------------------------------
+
     /**
      * Check if the expression has a ->with(...) call anywhere in its chain.
-     * Handles both instance-call chains (->with(...)) and mixed chains like
-     * Model::with('rel')->get().
      */
     private function hasWithCall(Expr $expr): bool
     {
@@ -173,7 +321,7 @@ final class EloquentNPlusOneVisitor extends AbstractRuleVisitor
         if ($node instanceof Node\Expr\PropertyFetch
             || $node instanceof Node\Expr\MethodCall
         ) {
-            $var = $node instanceof Node\Expr\PropertyFetch ? $node->var : $node->var;
+            $var = $node->var;
             if ($var instanceof Node\Expr\Variable
                 && is_string($var->name)
                 && $var->name === $varName
@@ -219,21 +367,43 @@ final class EloquentNPlusOneVisitor extends AbstractRuleVisitor
         return null;
     }
 
+    /**
+     * Multi-criteria heuristic deciding whether $name looks like an Eloquent
+     * relation rather than a plain scalar column.
+     *
+     * Decision tree:
+     *  1. Known non-relation names (query-builder methods, etc.) → false
+     *  2. Known common column names (blacklist) → false
+     *  3. Suffix matches a non-relation column suffix → false
+     *  4. At least 4 chars and not filtered above → true
+     *     (covers both camelCase relations like userProfile and plain ones like author)
+     *  5. Otherwise → false (too short / ambiguous)
+     *
+     * The blacklist in step 2 is the primary guard against false positives on
+     * scalar columns. Step 4 is deliberately broad because any word that
+     * survived the blacklist + suffix filters and has ≥ 4 chars is more likely
+     * a relation than a plain column.
+     */
     private function looksLikeRelation(string $name): bool
     {
-        // Skip known non-relation names
+        // 1. Skip known non-relation query-builder names
         if (in_array($name, self::NON_RELATION_NAMES, true)) {
             return false;
         }
 
-        // Skip column suffixes
+        // 2. Skip names that are common Eloquent column names
+        if (in_array(strtolower($name), self::COLUMN_BLACKLIST, true)) {
+            return false;
+        }
+
+        // 3. Skip column suffixes
         foreach (self::NON_RELATION_SUFFIXES as $suffix) {
             if (str_ends_with($name, $suffix)) {
                 return false;
             }
         }
 
-        // Must be camelCase or a plural word (simple: has at least 3 chars)
-        return strlen($name) >= 3;
+        // 4. At least 4 chars → likely a relation (author, comments, userProfile, …)
+        return strlen($name) >= 4;
     }
 }

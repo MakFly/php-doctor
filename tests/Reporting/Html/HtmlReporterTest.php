@@ -129,7 +129,7 @@ final class HtmlReporterTest extends TestCase
         $this->assertStringContainsString('php-doctor', $content);
     }
 
-    public function testHtmlReportContainsTailwindCdn(): void
+    public function testHtmlReportIsSelfContainedWithoutCdn(): void
     {
         $outputFile = $this->tempDir . '/report.html';
         $reporter   = new HtmlReporter($outputFile);
@@ -141,7 +141,10 @@ final class HtmlReporterTest extends TestCase
         $reporter->render($bag, $score, $ctx, $output);
 
         $content = file_get_contents($outputFile);
-        $this->assertStringContainsString('cdn.tailwindcss.com', $content);
+        // Report must be fully self-contained: no external CDN reference.
+        $this->assertStringNotContainsString('cdn.tailwindcss.com', $content);
+        // Must contain an embedded <style> block instead.
+        $this->assertStringContainsString('<style>', $content);
     }
 
     public function testHtmlReportContainsGlobalScore(): void

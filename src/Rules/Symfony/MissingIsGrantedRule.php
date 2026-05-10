@@ -218,19 +218,70 @@ final class MissingIsGrantedRule implements Rule
     }
 
     /**
+     * Recursively search for a $this->denyAccessUnlessGranted() call anywhere
+     * in the method body — including inside if/try/foreach/match blocks.
+     *
+     * Only calls on $this are considered authoritative (guards against false
+     * negatives from calls on other objects with the same method name).
+     *
      * @param Node[] $stmts
      */
     private function hasDenyAccessCall(array $stmts): bool
     {
         foreach ($stmts as $stmt) {
-            if ($stmt instanceof Node\Stmt\Expression
-                && $stmt->expr instanceof Node\Expr\MethodCall
-                && $stmt->expr->name instanceof Node\Identifier
-                && $stmt->expr->name->name === 'denyAccessUnlessGranted'
+            if ($this->nodeContainsDenyAccessCall($stmt)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Recursively check whether a node or any of its descendants contains a
+     * $this->denyAccessUnlessGranted(...) call.
+     */
+    private function nodeContainsDenyAccessCall(Node $node): bool
+    {
+        // Direct match: expression statement with $this->denyAccessUnlessGranted(...)
+        if ($node instanceof Node\Stmt\Expression
+            && $node->expr instanceof Node\Expr\MethodCall
+        ) {
+            $call = $node->expr;
+            if ($call->name instanceof Node\Identifier
+                && $call->name->name === 'denyAccessUnlessGranted'
+                && $call->var instanceof Node\Expr\Variable
+                && $call->var->name === 'this'
             ) {
                 return true;
             }
         }
+
+        // Also match bare method call expressions (e.g. inside a return or condition)
+        if ($node instanceof Node\Expr\MethodCall
+            && $node->name instanceof Node\Identifier
+            && $node->name->name === 'denyAccessUnlessGranted'
+            && $node->var instanceof Node\Expr\Variable
+            && $node->var->name === 'this'
+        ) {
+            return true;
+        }
+
+        // Recurse into all child nodes
+        foreach ($node->getSubNodeNames() as $subName) {
+            $sub = $node->$subName;
+            if ($sub instanceof Node) {
+                if ($this->nodeContainsDenyAccessCall($sub)) {
+                    return true;
+                }
+            } elseif (is_array($sub)) {
+                foreach ($sub as $child) {
+                    if ($child instanceof Node && $this->nodeContainsDenyAccessCall($child)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
         return false;
     }
 

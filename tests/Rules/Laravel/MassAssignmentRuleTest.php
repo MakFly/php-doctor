@@ -55,6 +55,36 @@ final class MassAssignmentRuleTest extends TestCase
         return new AnalysisInput($ctx, $snapshot);
     }
 
+    /**
+     * Helper that loads two files into the same AstSnapshot: a model file and a
+     * controller file. This allows the rule to resolve $fillable / $guarded from
+     * the model class when checking the controller's mass-assignment call.
+     */
+    private function makeInputMultiFile(string $modelCode, string $controllerCode): AnalysisInput
+    {
+        $ctx = new FrameworkContext(
+            framework:     Framework::Laravel,
+            rootPath:      '/fake',
+            consoleBinary: null,
+            composerData:  [],
+            sourcePaths:   [],
+        );
+
+        $modelFile = tempnam(sys_get_temp_dir(), 'phpdoctor_mass_model_') . '.php';
+        file_put_contents($modelFile, $modelCode);
+        $this->tmpFiles[] = $modelFile;
+
+        $controllerFile = tempnam(sys_get_temp_dir(), 'phpdoctor_mass_ctrl_') . '.php';
+        file_put_contents($controllerFile, $controllerCode);
+        $this->tmpFiles[] = $controllerFile;
+
+        $snapshot = new AstSnapshot($this->parserPool, new Collecting());
+        $snapshot->forFile($modelFile);
+        $snapshot->forFile($controllerFile);
+
+        return new AnalysisInput($ctx, $snapshot);
+    }
+
     // -------------------------------------------------------------------------
     // Positive tests
     // -------------------------------------------------------------------------
@@ -175,5 +205,83 @@ final class MassAssignmentRuleTest extends TestCase
         );
 
         $this->assertFalse($this->rule->appliesTo($ctx));
+    }
+
+    // -------------------------------------------------------------------------
+    // New tests (Fix 3 — $fillable / $guarded resolution)
+    // -------------------------------------------------------------------------
+
+    public function testDowngradesToLowWhenModelHasFillable(): void
+    {
+        // Model has $fillable defined → severity should be Low, not High
+        $modelCode = <<<'PHP'
+            <?php
+            namespace App\Models;
+            class Post extends Model {
+                protected $fillable = ['name', 'email'];
+            }
+            PHP;
+
+        $controllerCode = <<<'PHP'
+            <?php
+            use App\Models\Post;
+            class PostController {
+                public function store(Request $request) {
+                    Post::create($request->all());
+                }
+            }
+            PHP;
+
+        $findings = iterator_to_array($this->rule->analyze($this->makeInputMultiFile($modelCode, $controllerCode)));
+
+        $this->assertNotEmpty($findings, 'Should still produce a finding (Low) to remind to verify $fillable coverage');
+        $this->assertSame('laravel.security.mass-assignment', $findings[0]->ruleId);
+        $this->assertSame(Severity::Low, $findings[0]->severity, 'Severity should be Low when $fillable is defined');
+    }
+
+    public function testUpgradesToCriticalWhenModelHasGuardedEmpty(): void
+    {
+        // Model has $guarded = [] → severity should be Critical
+        $modelCode = <<<'PHP'
+            <?php
+            namespace App\Models;
+            class Post extends Model {
+                protected $guarded = [];
+            }
+            PHP;
+
+        $controllerCode = <<<'PHP'
+            <?php
+            use App\Models\Post;
+            class PostController {
+                public function store(Request $request) {
+                    Post::create($request->all());
+                }
+            }
+            PHP;
+
+        $findings = iterator_to_array($this->rule->analyze($this->makeInputMultiFile($modelCode, $controllerCode)));
+
+        $this->assertNotEmpty($findings, 'Should produce a Critical finding for $guarded = []');
+        $this->assertSame('laravel.security.mass-assignment', $findings[0]->ruleId);
+        $this->assertSame(Severity::Critical, $findings[0]->severity, 'Severity should be Critical when $guarded = []');
+    }
+
+    public function testKeepsHighWhenModelNotFound(): void
+    {
+        // Model class not in the AST cache → severity stays High (original behaviour)
+        $code = <<<'PHP'
+            <?php
+            class UserController {
+                public function store(Request $request) {
+                    User::create($request->all());
+                }
+            }
+            PHP;
+
+        $findings = iterator_to_array($this->rule->analyze($this->makeInput($code)));
+
+        $this->assertNotEmpty($findings);
+        $this->assertSame(Severity::High, $findings[0]->severity, 'Unknown model → should stay High');
     }
 }
