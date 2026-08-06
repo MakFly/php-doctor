@@ -3,8 +3,8 @@
 > **Health-check & quality audit CLI for Symfony 6/7/8 and Laravel 10/11/12/13 projects.**
 > Inspired by [react.doctor](https://www.react.doctor) — gives your PHP project a Lighthouse-style scored report you actually want to read.
 
-[![CI](https://github.com/MakFly/php-doctor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MakFly/php-doctor/actions/workflows/ci.yml)
-[![Compatibility](https://github.com/MakFly/php-doctor/actions/workflows/compat-matrix.yml/badge.svg?branch=main)](https://github.com/MakFly/php-doctor/actions/workflows/compat-matrix.yml)
+[![CI](https://github.com/dev-toolings/php-doctor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/dev-toolings/php-doctor/actions/workflows/ci.yml)
+[![Compatibility](https://github.com/dev-toolings/php-doctor/actions/workflows/compat-matrix.yml/badge.svg?branch=main)](https://github.com/dev-toolings/php-doctor/actions/workflows/compat-matrix.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-777bb3.svg)
 ![PHPStan level 6](https://img.shields.io/badge/PHPStan-level%206-2a4365.svg)
@@ -33,7 +33,7 @@ It is **not another linter**. It is an **orchestrator** that aggregates static a
 
 ```bash
 # Install via PHAR (recommended)
-curl -L -o php-doctor.phar https://github.com/MakFly/php-doctor/releases/latest/download/php-doctor.phar
+curl -L -o php-doctor.phar https://github.com/dev-toolings/php-doctor/releases/latest/download/php-doctor.phar
 chmod +x php-doctor.phar
 
 # Scan any Symfony / Laravel / generic PHP project
@@ -210,7 +210,7 @@ Full blueprint: [`docs/plans/PLAN-php-doctor-mvp.md`](docs/plans/PLAN-php-doctor
 ## Contributing
 
 ```bash
-git clone https://github.com/MakFly/php-doctor.git
+git clone https://github.com/dev-toolings/php-doctor.git
 cd php-doctor
 composer install
 

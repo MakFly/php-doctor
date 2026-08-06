@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/MakFly/php-doctor/security/advisories/new
+    url: https://github.com/dev-toolings/php-doctor/security/advisories/new
     about: Report a security issue privately via GitHub Security Advisories.
   - name: Discussion / question
-    url: https://github.com/MakFly/php-doctor/discussions
+    url: https://github.com/dev-toolings/php-doctor/discussions
     about: Ask a question or start a discussion (no bug or feature request).

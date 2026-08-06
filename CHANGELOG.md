@@ -50,8 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PHAR distribution via Box (single-file, no dependencies needed on target).
 - GitHub Actions: `ci.yml` (PHP 8.3/8.4 matrix) and `release.yml` (PHAR build on tag `v*`).
 
-[Unreleased]: https://github.com/MakFly/php-doctor/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/MakFly/php-doctor/releases/tag/v0.1.0
+[Unreleased]: https://github.com/dev-toolings/php-doctor/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/dev-toolings/php-doctor/releases/tag/v0.1.0
 
 ---
 

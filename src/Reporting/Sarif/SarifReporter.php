@@ -25,7 +25,7 @@ final class SarifReporter implements Reporter
     private const SARIF_VERSION    = '2.1.0';
     private const SARIF_SCHEMA_URI = 'https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json';
     private const TOOL_VERSION     = '0.1.0';
-    private const TOOL_INFO_URI    = 'https://github.com/MakFly/php-doctor';
+    private const TOOL_INFO_URI    = 'https://github.com/dev-toolings/php-doctor';
 
     public function __construct(
         private readonly ?string $outputFile = null,

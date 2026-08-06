@@ -16,7 +16,7 @@ Only the latest minor version receives security fixes. The MVP series is `0.1.x`
 Use one of:
 
 1. **GitHub Security Advisories** (preferred):
-   <https://github.com/MakFly/php-doctor/security/advisories/new>
+   <https://github.com/dev-toolings/php-doctor/security/advisories/new>
 2. Email: open a draft advisory and add the reporter via GitHub UI.
 
 You can expect:

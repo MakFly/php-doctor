@@ -6,8 +6,8 @@ authors:
   - given-names: "Kevin"
     alias: "MakFly"
     affiliation: "Independent"
-repository-code: "https://github.com/MakFly/php-doctor"
-url: "https://github.com/MakFly/php-doctor"
+repository-code: "https://github.com/dev-toolings/php-doctor"
+url: "https://github.com/dev-toolings/php-doctor"
 abstract: >
   php-doctor is an opinionated health-audit CLI for PHP projects.
   It detects Symfony 6/7/8 and Laravel 10/11/12/13 projects, runs an
